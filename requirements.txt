@@ -1,4 +1,8 @@
-PySide6>=6.10
-PySide6-Fluent-Widgets>=1.8
-certifi>=2024.8.30
-pillow>=11
+PySide6==6.12.0
+PySide6-Fluent-Widgets==1.11.3
+certifi==2026.7.22
+pillow==12.3.0
+# Pulled in by PySide6-Fluent-Widgets; pinned too, since the window's look depends on them.
+PySideSix-Frameless-Window==0.8.2
+darkdetect==0.8.0
+pywin32==312; sys_platform == "win32"
