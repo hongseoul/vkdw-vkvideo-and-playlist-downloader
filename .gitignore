@@ -4,3 +4,6 @@ __pycache__/
 downloads/
 *.part
 *.part.mp4
+# build.bat output
+/build/
+/dist/

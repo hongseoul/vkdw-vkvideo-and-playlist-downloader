@@ -3,6 +3,7 @@
 The app runs under python.exe, not pythonw.exe: the VPN rule on this machine
 matches python.exe. run.bat sets VKDW_HIDE_CONSOLE=1 and starts the app in a
 console of its own, which is hidden here before the window libraries load.
+VKDW.exe has no console at all, so an error at start is shown in a message box.
 Only the standard library is used, so this loads at once.
 """
 
@@ -19,6 +20,7 @@ from vkdw.i18n import tr
 
 SW_HIDE = 0
 SW_SHOW = 5
+MB_ICONERROR = 0x10
 HIDE_VARIABLE = "VKDW_HIDE_CONSOLE"
 
 # Kept open for the life of the process: faulthandler writes into it on a hard crash.
@@ -46,6 +48,15 @@ def _show_window(hwnd: int, command: int) -> None:
         import ctypes
 
         ctypes.windll.user32.ShowWindow(hwnd, command)
+    except (AttributeError, OSError):
+        pass
+
+
+def _message_box(text: str) -> None:
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, text, tr("app.title"), MB_ICONERROR)
     except (AttributeError, OSError):
         pass
 
@@ -96,8 +107,11 @@ def report_crash(hidden: bool) -> None:
     """The app failed to start or stopped on an error: log it and let the user read it."""
     text = traceback.format_exc()
     _write(text)
-    if sys.stderr is not None:
-        sys.stderr.write(text)
+    if sys.stderr is None:
+        # VKDW.exe has no console at all: without a message box the window would just never appear.
+        _message_box(tr("crash.stopped", path=log_path()))
+        return
+    sys.stderr.write(text)
     if not hidden:
         return
     hwnd = _console_window()

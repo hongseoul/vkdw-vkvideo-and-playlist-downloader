@@ -62,6 +62,23 @@ class ConsoleTests(unittest.TestCase):
         self.shown.assert_not_called()
         wait.assert_not_called()
 
+    def test_crash_without_any_console_shows_a_message_box(self):
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / "errors.log"
+            with (
+                patch("vkdw.console.log_path", return_value=log),
+                patch("vkdw.console.sys.stderr", None),
+                patch("vkdw.console._message_box") as box,
+                patch("builtins.input") as wait,
+            ):
+                try:
+                    raise RuntimeError("сломалось в exe")
+                except RuntimeError:
+                    console.report_crash(False)
+            self.assertIn("сломалось в exe", log.read_text(encoding="utf-8"))
+        self.assertIn(str(log), box.call_args.args[0])
+        wait.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
