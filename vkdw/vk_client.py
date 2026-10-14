@@ -289,7 +289,8 @@ def target_raw_id(target: Target) -> str:
 def safe_filename(name: str) -> str:
     cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", name or "")
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")
-    return cleaned[:150]
+    # Again after the cut: Windows drops spaces and dots at the end of a folder name.
+    return cleaned[:150].rstrip(" .")
 
 
 def format_duration(seconds: int) -> str:

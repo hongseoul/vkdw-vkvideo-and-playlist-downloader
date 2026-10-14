@@ -288,6 +288,7 @@ TEXTS = {
     # Settings and dialogs
     "settings.tooltip": "Настройки",
     "settings.check_on_start": "Проверять закладки при запуске",
+    "settings.about": "VKDW {version} на GitHub",
     "settings.check_updates": "Проверять обновления при запуске",
     "update.title": "Вышла версия {version}",
     "update.text": "Сейчас установлена {current}.",

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 from PIL import Image
 
 from vkdw.controller import DownloadController, saved_ids, target_dir
-from vkdw.downloader import EXISTS, download_video, name_width, output_path
+from vkdw.downloader import EXISTS, FILE_ROOM, MAX_PATH_CHARS, download_video, name_width, output_path
 from vkdw.i18n import set_language
 from vkdw.vk_client import Cancelled, PlaylistInfo, Target, VideoItem, VkError
 
@@ -46,6 +46,25 @@ class SavedFilesTests(unittest.TestCase):
         self.assertEqual(saved_ids([(1, item)], self.path, "number", 1), {item.raw_id})
         self.assertEqual(target_dir(self.path, playlist, True), self.path / "Сериал")
         self.assertEqual(target_dir(self.path, playlist, False), self.path)
+
+    def test_a_cut_name_counts_as_saved(self):
+        deep = self.path / ("п" * max(10, 190 - len(str(self.path))))
+        deep.mkdir()
+        item = make_playlist("Сериал", 1, 10, ["Очень длинное название серии " * 5]).videos[0]
+        dest = output_path(deep, item, 1, name_width(1), "number")
+        self.assertIn("… [1_1]", dest.name)
+        dest.write_bytes(b"x")
+        self.assertEqual(saved_ids([(1, item)], deep, "number", 1), {item.raw_id})
+
+    def test_a_playlist_folder_leaves_room_for_its_files(self):
+        base = Path("D:/" + "п" * 120)
+        playlist = make_playlist("Сериал с очень длинным названием " * 5, 1, 10, ["один", "два"])
+        folder = target_dir(base, playlist, True)
+        self.assertEqual(folder.parent, base)
+        self.assertLessEqual(len(str(folder)) + FILE_ROOM, MAX_PATH_CHARS)
+        self.assertFalse(folder.name.endswith((" ", ".")))
+        # A short base folder keeps the whole name, as before.
+        self.assertEqual(target_dir(Path("D:/Видео"), playlist, True).name, playlist.title[:150].rstrip())
 
 
 class ControllerTests(unittest.TestCase):
@@ -459,6 +478,20 @@ class PlaylistFileTests(unittest.TestCase):
         self.ctrl.playlists[playlist.key] = playlist
         job = self.ctrl.make_job(playlist, pairs, self.path, "360p", True)
         self.ctrl._execute(job)
+
+    def test_long_titles_in_a_deep_folder_still_fit_windows_paths(self):
+        base = self.path / ("п" * max(10, 150 - len(str(self.path))))
+        title = "Очень длинное название сериала, которое не помещается " * 3
+        episode = "Очень длинное название серии номер один " * 4
+        playlist = make_playlist(title, 1, 10, [episode, episode + "и ещё немного"])
+        self.ctrl.playlists[playlist.key] = playlist
+        job = self.ctrl.make_job(playlist, list(enumerate(playlist.videos, start=1)), base, "360p", True)
+        self.ctrl._execute(job)
+        files = sorted(job.target_dir.iterdir())
+        self.assertEqual([path.suffix for path in files], [".mp4", ".mp4", ".m3u8"])  # two titles cut alike stay two files
+        for path in files:
+            room = len(".part.json.tmp") if path.suffix == ".mp4" else len(".tmp")
+            self.assertLessEqual(len(str(path)) + room, MAX_PATH_CHARS, path.name)
 
     def test_saved_videos_are_listed_in_playlist_order(self):
         playlist = make_playlist("Сериал: сезон 1", 1, 10, ["первая", "вторая", "третья"])

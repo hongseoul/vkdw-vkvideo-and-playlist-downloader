@@ -22,9 +22,11 @@ from pathlib import Path
 
 from qfluentwidgets import InfoBar, PushButton
 
+from vkdw import __version__
 from vkdw.downloader import EXISTS
 from vkdw.i18n import set_language
 from vkdw.vk_client import Cancelled, PlaylistInfo, Target, VideoItem, VkError
+from vkdw.updates import REPO_URL
 
 app = None
 DRAFT_ID = "draft"
@@ -466,9 +468,14 @@ class WindowTests(unittest.TestCase):
         ]
         if sys.platform == "win32":
             expected.append("Выключить компьютер после очереди")
+        expected.append(f"VKDW {__version__} на GitHub")
         self.assertEqual(labels, expected)
         # Off unless turned on, except the update check, which is on unless turned off.
-        self.assertEqual([action.isChecked() for action in menu.menuActions()[5:]], [False, True, False][: len(expected) - 5])
+        switches = [action.isChecked() for action in menu.menuActions()[5:-1]]
+        self.assertEqual(switches, [False, True, False][: len(switches)])
+        with patch("vkdw.ui.window.QDesktopServices.openUrl") as open_url:
+            menu.menuActions()[-1].trigger()
+        self.assertEqual(open_url.call_args.args[0].toString(), REPO_URL)
         self.assertEqual(menu._subMenus, [])
         # Items are measured with the font they are drawn with, so the longest one fits.
         widest = max(menu.view.fontMetrics().horizontalAdvance(label) for label in labels)

@@ -16,6 +16,7 @@ import time
 import traceback
 from pathlib import Path
 
+from vkdw import __version__
 from vkdw.i18n import tr
 
 SW_HIDE = 0
@@ -72,12 +73,23 @@ def hide_if_asked() -> bool:
     return True
 
 
+def _build() -> str:
+    """Which VKDW wrote an entry, to match a report with its version: «VKDW 1.0.0 (exe), Windows 10.0.19045»."""
+    kind = "exe" if getattr(sys, "frozen", False) else f"Python {sys.version.split()[0]}"
+    text = f"VKDW {__version__} ({kind})"
+    if sys.platform == "win32":
+        # Not platform.version(): it may start a console program to ask, and VKDW.exe would flash it.
+        windows = sys.getwindowsversion()
+        text += f", Windows {windows.major}.{windows.minor}.{windows.build}"
+    return text
+
+
 def _write(text: str) -> None:
     path = log_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as handle:
-            handle.write(time.strftime("\n%Y-%m-%d %H:%M:%S\n"))
+            handle.write(time.strftime("\n%Y-%m-%d %H:%M:%S") + f" · {_build()}\n")
             handle.write(text)
     except OSError:
         pass

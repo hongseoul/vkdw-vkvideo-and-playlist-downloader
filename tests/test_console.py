@@ -5,7 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from vkdw import console
+from vkdw import __version__, console
 
 
 class ConsoleTests(unittest.TestCase):
@@ -75,7 +75,9 @@ class ConsoleTests(unittest.TestCase):
                     raise RuntimeError("сломалось в exe")
                 except RuntimeError:
                     console.report_crash(False)
-            self.assertIn("сломалось в exe", log.read_text(encoding="utf-8"))
+            text = log.read_text(encoding="utf-8")
+            self.assertIn("сломалось в exe", text)
+            self.assertIn(f"VKDW {__version__}", text)  # a report can be matched to its build
         self.assertIn(str(log), box.call_args.args[0])
         wait.assert_not_called()
 

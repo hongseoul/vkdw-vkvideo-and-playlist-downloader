@@ -49,7 +49,7 @@ from qfluentwidgets import (
 from vkdw import __version__, bookmarks, i18n, session
 from vkdw.archive import Archive
 from vkdw.controller import DownloadController, playlists_word, saved_ids, target_dir, videos_word
-from vkdw.downloader import QUALITY_CHOICES, duplicate_ids, name_width, output_path, quality_label
+from vkdw.downloader import QUALITY_CHOICES, duplicate_ids, fit_name, name_width, output_path, quality_label
 from vkdw.i18n import count, number, tr
 from vkdw.jobs import FINISHED, PENDING, status_label
 from vkdw.settings import default_folder, fmt_size, load_settings, save_settings
@@ -72,7 +72,7 @@ from vkdw.ui.sidebar import COLLECTION, DRAFT, BookmarksView, CardData, QueuePan
 from vkdw.ui.theme import JOB_COLORS, THEME_MODES, WINDOW_BG, apply_language, apply_theme, color
 from vkdw.ui.video_list import INDEX_ROLE, ITEM_ROLE, THUMB_H, THUMB_W, VideoListModel, VideoListView
 from vkdw.ui.widgets import TextLine, polished
-from vkdw.updates import Release
+from vkdw.updates import REPO_URL, Release
 from vkdw.vk_client import (
     PlaylistInfo,
     Target,
@@ -1552,7 +1552,8 @@ class MainWindow(FluentWidget):
             return
         job = self.controller.job(self._view_job_id)
         folder = job.target_dir if job is not None and job.target_dir else self._target_dir(playlist)
-        name = safe_filename(playlist.title) or "playlist"
+        # save_image writes «name.jpg.part» first; a PNG cover gets the same length.
+        name = fit_name(folder, safe_filename(playlist.title) or "playlist", len(".jpg.part"))
         self.controller.save_covers([], album=(playlist, folder / f"{name}.jpg"))
 
     def _save_video_covers(self, pairs) -> None:
@@ -1643,6 +1644,11 @@ class MainWindow(FluentWidget):
             shutdown.setChecked(self._shutdown_after)
             shutdown.triggered.connect(self._set_shutdown_after)
             menu.addAction(shutdown)
+        menu.addSeparator()
+        # The version, for reports, and the way to the releases and the source code.
+        about = Action(FluentIcon.GITHUB, tr("settings.about", version=__version__))
+        about.triggered.connect(lambda: QDesktopServices.openUrl(QUrl(REPO_URL)))
+        menu.addAction(about)
         self._popup_above(menu, self.sidebar.settings_button, align_right=True)
 
     def _set_check_on_start(self, checked: bool) -> None:

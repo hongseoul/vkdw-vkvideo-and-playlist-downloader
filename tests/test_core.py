@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from vkdw.downloader import choose_source, output_path
+from vkdw.downloader import MAX_PATH_CHARS, choose_source, fit_name, output_path
 from vkdw.i18n import set_language
 from vkdw.jobs import PlaylistQueue, QueueJob
 from vkdw.thumbs import ThumbLoader, save_image
@@ -159,6 +159,36 @@ class NameTests(unittest.TestCase):
         undated = VideoItem(1, 2, "Ролик", 10, "", "")
         self.assertEqual(output_path(Path("out"), undated, 3, 3, "date").name, "Ролик.mp4")
         self.assertEqual(output_path(Path("out"), item, 3, 3, "title").name, "Ролик.mp4")
+
+    def test_a_cut_title_does_not_end_in_a_space(self):
+        # Windows would drop the space from a folder name, and the path with it would lead nowhere.
+        self.assertEqual(safe_filename("а" * 149 + " конец"), "а" * 149)
+
+    def test_names_that_fit_stay_as_they_were(self):
+        item = VideoItem(-1, 2, "Длинное название " * 8, 10, "", "")
+        name = output_path(Path("D:/Видео/Сериал"), item, 3, 3, "number").name
+        self.assertEqual(name, f"003 - {safe_filename(item.title)}.mp4")
+
+    def test_a_name_too_long_for_its_folder_is_cut_and_gets_the_id(self):
+        folder = Path("D:/" + "п" * 150)
+        item = VideoItem(-1, 2, "Очень длинное название " * 6, 10, "", "")
+        path = output_path(folder, item, 3, 3, "number")
+        self.assertLessEqual(len(str(path)) + len(".part.json.tmp"), MAX_PATH_CHARS)
+        self.assertTrue(path.name.startswith("003 - Очень длинное"), path.name)
+        self.assertTrue(path.name.endswith("… [-1_2].mp4"), path.name)
+
+    def test_titles_cut_to_the_same_start_stay_two_files(self):
+        folder = Path("D:/" + "п" * 150)
+        first = VideoItem(-1, 2, "Одно и то же начало " * 6 + "А", 10, "", "")
+        second = VideoItem(-1, 3, "Одно и то же начало " * 6 + "Б", 10, "", "")
+        self.assertNotEqual(output_path(folder, first, 1, 3, "title"), output_path(folder, second, 1, 3, "title"))
+
+    def test_fit_name_leaves_room_for_what_follows(self):
+        folder = Path("D:/" + "п" * 150)
+        name = fit_name(folder, "название. " * 30, len(".m3u8.tmp"))
+        self.assertLessEqual(len(str(folder / name)) + len(".m3u8.tmp"), MAX_PATH_CHARS)
+        self.assertFalse(name.endswith((" ", ".")))
+        self.assertEqual(fit_name(Path("D:/Видео"), "Сериал", 80), "Сериал")
 
 
 class ApiAnswerTests(unittest.TestCase):

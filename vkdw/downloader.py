@@ -163,6 +163,29 @@ def resolve_hls(url: str, max_height: int | None, ssl_context) -> tuple[str, lis
 
 # File names
 
+# A Windows path is at most 259 characters (MAX_PATH with its closing NUL). Long paths can be
+# turned on, but Explorer and many players still fail on them, so names are cut to fit.
+MAX_PATH_CHARS = 259
+# The longest name a download writes beside its video: the .part's progress file while
+# write_atomic replaces it.
+LONGEST_SUFFIX = ".mp4.part.json.tmp"
+# What a playlist folder leaves for the names of its files: a separator, «001 - », the start
+# of a title, the id a cut name gets and LONGEST_SUFFIX.
+FILE_ROOM = 80
+# A cut name keeps at least this much, even where the chosen folder itself is too deep.
+MIN_NAME = 20
+
+
+def fit_name(folder: Path, name: str, after: int) -> str:
+    """name, cut so that folder, a separator, name and after more characters stay within
+    MAX_PATH_CHARS. A cut name loses the spaces and dots at its end: Windows drops them from
+    a folder name, and the path with them would lead nowhere."""
+    room = MAX_PATH_CHARS - len(str(folder)) - 1 - after
+    if len(name) <= room:
+        return name
+    return name[: max(room, MIN_NAME)].rstrip(" .")
+
+
 def name_width(total: int) -> int:
     """Digits of the number in file names: 001 for up to 999 videos, more for longer playlists."""
     return max(3, len(str(total)))
@@ -213,11 +236,17 @@ def duplicate_ids(pairs, width: int, naming: str) -> frozenset[str]:
 
 def output_path(folder: Path, item: VideoItem, index: int, width: int, naming: str, tagged=frozenset()) -> Path:
     """naming: number (001 - title, playlist order), date (2026-10-11 - title) or title.
-    A video in tagged (see duplicate_ids) gets its id added: «title [-1_2].mp4»."""
+    A video in tagged (see duplicate_ids) gets its id added: «title [-1_2].mp4».
+
+    A name too long for the folder (see MAX_PATH_CHARS) is cut and then always gets the id,
+    so two titles cut to the same start stay two files: «001 - Long tit… [-1_2].mp4»."""
     name = _base_name(item, index, width, naming)
-    if _short(item) in tagged:
-        name = f"{name} [{_short(item)}]"
-    return folder / f"{name}.mp4"
+    tag = f" [{_short(item)}]" if _short(item) in tagged else ""
+    room = MAX_PATH_CHARS - len(str(folder)) - 1 - len(LONGEST_SUFFIX)
+    if len(name) + len(tag) > room:
+        tag = f" [{_short(item)}]"
+        name = name[: max(room - len(tag) - 1, MIN_NAME)].rstrip(" .") + "…"
+    return folder / f"{name}{tag}.mp4"
 
 
 def playlist_file_text(entries) -> str:

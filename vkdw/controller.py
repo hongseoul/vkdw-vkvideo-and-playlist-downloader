@@ -39,10 +39,12 @@ from vkdw import updates
 from vkdw.archive import Archive
 from vkdw.downloader import (
     EXISTS,
+    FILE_ROOM,
     LOW_SPACE,
     QUALITY_CHOICES,
     download_video,
     duplicate_ids,
+    fit_name,
     free_space,
     is_saved,
     name_width,
@@ -86,7 +88,7 @@ def target_dir(folder: Path, playlist: PlaylistInfo, subfolder: bool) -> Path:
     """Where the videos of a playlist are saved."""
     folder = Path(folder)
     if subfolder and not playlist.single:
-        folder = folder / (safe_filename(playlist.title) or "playlist")
+        folder = folder / fit_name(folder, safe_filename(playlist.title) or "playlist", FILE_ROOM)
     return folder
 
 
@@ -809,7 +811,7 @@ class DownloadController:
                 continue
         if not entries:
             return
-        name = f"{safe_filename(job.title) or 'playlist'}.m3u8"
+        name = fit_name(target_dir, safe_filename(job.title) or "playlist", len(".m3u8.tmp")) + ".m3u8"
         if not write_atomic(target_dir / name, playlist_file_text(entries)):
             self._events.put(("log", tr("log.m3u_failed", name=name), "warn"))
 
