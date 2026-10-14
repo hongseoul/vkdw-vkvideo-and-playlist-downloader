@@ -1,9 +1,11 @@
 # PyInstaller spec for VKDW.exe: a folder build that needs no Python and shows no console.
 # Run build.bat; the result is dist\VKDW, with VKDW.exe and its _internal folder.
 
+import importlib.metadata
 import io
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -85,6 +87,32 @@ def used(entries):
     return [entry for entry in entries if not any(part in entry[0].replace("\\", "/").lower() for part in UNUSED)]
 
 
+# Libraries whose own license files go along; Python's covers what it ships (OpenSSL, libffi...).
+LICENSED = ("PySide6-Fluent-Widgets", "PySideSix-Frameless-Window", "darkdetect", "pillow", "certifi", "pywin32")
+
+
+def licenses() -> list:
+    """License texts of everything the folder carries besides VKDW itself, for _internal/licenses."""
+    entries = [
+        ("licenses/Python/LICENSE.txt", str(Path(sys.base_prefix) / "LICENSE.txt"), "DATA"),
+        # Qt, PySide6 and shiboken6 come under the LGPL; their wheels name it but leave its text out.
+        ("licenses/Qt and PySide6/LGPL-3.0.txt", str(ROOT / "packaging" / "LGPL-3.0.txt"), "DATA"),
+    ]
+    for name in LICENSED:
+        dist = importlib.metadata.distribution(name)
+        for file in dist.files or ():
+            parts = file.parts
+            if not parts[0].endswith(".dist-info"):
+                continue
+            rest = parts[1:]
+            if rest[0] == "licenses":
+                rest = rest[1:]
+            elif not any(word in file.name.lower() for word in ("licen", "copying")):
+                continue
+            entries.append(("/".join(("licenses", name) + rest), str(dist.locate_file(file)), "DATA"))
+    return entries
+
+
 a = Analysis(
     [str(ROOT / "vkdw" / "__main__.py")],
     pathex=[str(ROOT)],
@@ -93,7 +121,7 @@ a = Analysis(
     noarchive=False,
 )
 a.binaries = used(a.binaries)
-a.datas = used(a.datas)
+a.datas = used(a.datas) + licenses()
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
@@ -108,3 +136,5 @@ exe = EXE(
     upx=False,
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="VKDW", upx=False)
+# VKDW's own license next to the exe, where people look for it.
+shutil.copyfile(ROOT / "LICENSE", Path(DISTPATH) / "VKDW" / "LICENSE.txt")
