@@ -288,6 +288,11 @@ TEXTS = {
     # Settings and dialogs
     "settings.tooltip": "Settings",
     "settings.check_on_start": "Check bookmarks at startup",
+    "settings.check_updates": "Check for updates at startup",
+    "update.title": "Version {version} is out",
+    "update.text": "You have {current}.",
+    "update.open": "Download",
+    "log.update": "Version {version} is out: {url}",
     "shutdown.cancel": "Don't shut down",
     "shutdown.text": "The queue is downloaded. The computer shuts down in {seconds} s.",
     "shutdown.title": "The computer will shut down",

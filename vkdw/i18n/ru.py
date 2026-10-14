@@ -288,6 +288,11 @@ TEXTS = {
     # Settings and dialogs
     "settings.tooltip": "Настройки",
     "settings.check_on_start": "Проверять закладки при запуске",
+    "settings.check_updates": "Проверять обновления при запуске",
+    "update.title": "Вышла версия {version}",
+    "update.text": "Сейчас установлена {current}.",
+    "update.open": "Скачать",
+    "log.update": "Вышла версия {version}: {url}",
     "shutdown.cancel": "Не выключать",
     "shutdown.text": "Очередь скачана. Компьютер выключится через {seconds} с.",
     "shutdown.title": "Компьютер выключится",

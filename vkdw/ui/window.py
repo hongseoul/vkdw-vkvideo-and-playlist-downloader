@@ -46,7 +46,7 @@ from qfluentwidgets import (
     qconfig,
 )
 
-from vkdw import bookmarks, i18n, session
+from vkdw import __version__, bookmarks, i18n, session
 from vkdw.archive import Archive
 from vkdw.controller import DownloadController, playlists_word, saved_ids, target_dir, videos_word
 from vkdw.downloader import QUALITY_CHOICES, duplicate_ids, name_width, output_path, quality_label
@@ -72,6 +72,7 @@ from vkdw.ui.sidebar import COLLECTION, DRAFT, BookmarksView, CardData, QueuePan
 from vkdw.ui.theme import JOB_COLORS, THEME_MODES, WINDOW_BG, apply_language, apply_theme, color
 from vkdw.ui.video_list import INDEX_ROLE, ITEM_ROLE, THUMB_H, THUMB_W, VideoListModel, VideoListView
 from vkdw.ui.widgets import TextLine, polished
+from vkdw.updates import Release
 from vkdw.vk_client import (
     PlaylistInfo,
     Target,
@@ -110,6 +111,8 @@ def read_links_file(path: Path) -> str:
 
 # Seconds Windows waits before it shuts down after the queue, so the shutdown can be cancelled.
 SHUTDOWN_DELAY = 60
+# Milliseconds after start before GitHub is asked for a newer release: the window comes first.
+UPDATE_DELAY = 3000
 
 
 def hint_for(kind: str) -> str:
@@ -1370,6 +1373,8 @@ class MainWindow(FluentWidget):
             self._on_check_done(*event[1:])
         elif kind == "covers_saved":
             self._on_covers_saved(*event[1:])
+        elif kind == "update":
+            self._offer_update(event[1])
 
     def _on_overall(self, job_id: str, key: tuple, position: int, total: int, item: VideoItem) -> None:
         self._current = (job_id, key, position, total, item, None)
@@ -1629,6 +1634,10 @@ class MainWindow(FluentWidget):
         check.setChecked(bool(self._settings.get("check_bookmarks")))
         check.triggered.connect(self._set_check_on_start)
         menu.addAction(check)
+        update_check = Action(tr("settings.check_updates"), checkable=True)
+        update_check.setChecked(bool(self._settings.get("check_updates", True)))
+        update_check.triggered.connect(self._set_check_updates)
+        menu.addAction(update_check)
         if sys.platform == "win32":
             shutdown = Action(tr("settings.shutdown_after"), checkable=True)
             shutdown.setChecked(self._shutdown_after)
@@ -1640,6 +1649,37 @@ class MainWindow(FluentWidget):
         """Only a check and badges at start; nothing downloads by itself."""
         self._settings["check_bookmarks"] = bool(checked)
         self._remember()
+
+    def _set_check_updates(self, checked: bool) -> None:
+        self._settings["check_updates"] = bool(checked)
+        self._remember()
+
+    def start_update_check(self) -> None:
+        """Once a run, shortly after start, unless turned off in ⚙. Not in __init__, so tests stay offline."""
+        if self._settings.get("check_updates", True):
+            QTimer.singleShot(UPDATE_DELAY, self.controller.check_updates)
+
+    def _offer_update(self, release: Release) -> None:
+        """A bar that stays until closed, with a button to the release page."""
+        self.controller.note(tr("log.update", version=release.version, url=release.url))
+        bar = InfoBar(
+            InfoBarIcon.INFORMATION,
+            tr("update.title", version=release.version),
+            tr("update.text", current=__version__),
+            isClosable=True,
+            duration=-1,
+            position=InfoBarPosition.TOP_RIGHT,
+            parent=self.panel,
+        )
+        button = PushButton(tr("update.open"), bar)
+
+        def open_page():
+            bar.close()
+            QDesktopServices.openUrl(QUrl(release.url))
+
+        button.clicked.connect(open_page)
+        bar.addWidget(button)
+        bar.show()
 
     def _set_shutdown_after(self, checked: bool) -> None:
         self._shutdown_after = bool(checked)

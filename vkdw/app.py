@@ -39,4 +39,5 @@ def main() -> None:
         window.showMaximized()
     else:
         window.show()
+    window.start_update_check()
     sys.exit(app.exec())

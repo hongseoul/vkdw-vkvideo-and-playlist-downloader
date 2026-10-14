@@ -23,6 +23,7 @@ Events returned by drain():
     ("checked", key, PlaylistInfo | None, error)     check_lists read one list (or failed: error)
     ("check_done", read, failed)                     check_lists went through all its lists
     ("covers_saved", [Path], failed)                 save_covers wrote these images; failed did not save
+    ("update", Release)                              check_updates found a newer release
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from vkdw import updates
 from vkdw.archive import Archive
 from vkdw.downloader import (
     EXISTS,
@@ -345,6 +347,17 @@ class DownloadController:
             saved.append(path)
             self._log(tr("log.cover_saved", path=path), "ok")
         self._events.put(("covers_saved", saved, failed))
+
+    # A newer version
+
+    def check_updates(self) -> None:
+        """Ask GitHub in the background whether a newer release is out; ("update", Release) if so."""
+        threading.Thread(target=self._update_worker, daemon=True).start()
+
+    def _update_worker(self) -> None:
+        release = updates.check()
+        if release is not None:
+            self._events.put(("update", release))
 
     def adopt(self, info: PlaylistInfo, source: Target) -> PlaylistInfo:
         """Keep a list read by check_lists as the opened one of its key. An owner page that has

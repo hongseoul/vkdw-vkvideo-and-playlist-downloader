@@ -20,7 +20,7 @@ except ImportError as exc:  # pragma: no cover - only without the GUI libraries
 
 from pathlib import Path
 
-from qfluentwidgets import PushButton
+from qfluentwidgets import InfoBar, PushButton
 
 from vkdw.downloader import EXISTS
 from vkdw.i18n import set_language
@@ -455,11 +455,20 @@ class WindowTests(unittest.TestCase):
             self.window._settings_menu()
         menu = menus[0]
         labels = [action.text() for action in menu.menuActions()]
-        expected = ["Тема как в системе", "Тёмная тема", "Светлая тема", "Русский", "English", "Проверять закладки при запуске"]
+        expected = [
+            "Тема как в системе",
+            "Тёмная тема",
+            "Светлая тема",
+            "Русский",
+            "English",
+            "Проверять закладки при запуске",
+            "Проверять обновления при запуске",
+        ]
         if sys.platform == "win32":
             expected.append("Выключить компьютер после очереди")
         self.assertEqual(labels, expected)
-        self.assertFalse(any(action.isChecked() for action in menu.menuActions()[5:]))
+        # Off unless turned on, except the update check, which is on unless turned off.
+        self.assertEqual([action.isChecked() for action in menu.menuActions()[5:]], [False, True, False][: len(expected) - 5])
         self.assertEqual(menu._subMenus, [])
         # Items are measured with the font they are drawn with, so the longest one fits.
         widest = max(menu.view.fontMetrics().horizontalAdvance(label) for label in labels)
@@ -487,6 +496,29 @@ class WindowTests(unittest.TestCase):
             self.assertEqual(run.call_args_list[-1].args[0], ["shutdown", "/a"])
         self._pump()
         self.assertIn("Выключение отменено.", [entry.text for entry in self.window.controller.log])
+
+    def test_a_newer_release_shows_a_bar_with_its_page(self):
+        from vkdw.updates import Release
+
+        url = "https://github.com/hongseoul/vkdw-vkvideo-and-playlist-downloader/releases/tag/v9.0.0"
+        self.window.controller._events.put(("update", Release("9.0.0", url)))
+        self._pump()
+        self._pump()  # the log line goes through the event queue too
+        self.assertIn(f"Вышла версия 9.0.0: {url}", [entry.text for entry in self.window.controller.log])
+        bar = next(bar for bar in self.window.panel.findChildren(InfoBar) if bar.title == "Вышла версия 9.0.0")
+        button = next(button for button in bar.findChildren(PushButton) if button.text() == "Скачать")
+        with patch("vkdw.ui.window.QDesktopServices.openUrl") as open_url:
+            button.click()
+        self.assertEqual(open_url.call_args.args[0].toString(), url)
+
+    def test_update_check_can_be_turned_off(self):
+        with patch("vkdw.ui.window.QTimer.singleShot") as later:
+            self.window.start_update_check()
+            self.assertEqual(later.call_args.args[1], self.window.controller.check_updates)
+            later.reset_mock()
+            self.window._set_check_updates(False)
+            self.window.start_update_check()
+            later.assert_not_called()
 
     def test_no_shutdown_while_the_queue_has_more(self):
         self.window._set_shutdown_after(True)
